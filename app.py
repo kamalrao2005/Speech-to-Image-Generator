@@ -1,66 +1,70 @@
 import os
 import time
-import speech_recognition as sr
 import torch
-
+import speech_recognition as sr
 from diffusers import StableDiffusionPipeline
 
+# Configuration
 
-# Create the folder where generated images will be saved
+MODEL_NAME = "runwayml/stable-diffusion-v1-5"
 OUTPUT_FOLDER = "generated_images"
+
+# Create output folder if it doesn't exist
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 
-print("=" * 55)
-print("🎤 Speech to Image Generator")
-print("Say 'exit' to close the application.")
-print("=" * 55)
+# Banner
 
 
-# Select CPU or NVIDIA GPU
+print("=" * 60)
+print("🎤 Speech-to-Image Generator")
+print("=" * 60)
+print("Say 'exit' anytime to close the application.\n")
+
+
+# Device Selection
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
-
-print(f"\nUsing device: {device.upper()}")
-print("Loading the AI image model...")
-print("The first launch may take some time because")
-print("the model needs to download.\n")
-
-
-# Automatically use GPU if available; otherwise use CPU
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# Use float16 on GPU and float32 on CPU
 dtype = torch.float16 if device == "cuda" else torch.float32
 
-print(f"\nUsing device: {device.upper()}")
-print("Loading the AI image model...")
-print("The first launch may take some time because")
-print("the model needs to download.\n")
+print(f"🖥️  Device : {device.upper()}")
+print(f"🧠 Model  : Stable Diffusion v1.5")
+print("\nLoading AI model...")
+print("The first launch may take several minutes because")
+print("the model will be downloaded from Hugging Face.\n")
 
-# Load the Stable Diffusion model
+# Load Stable Diffusion Model
+
 pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
+    MODEL_NAME,
     torch_dtype=dtype
 )
 
-# Move the model to the selected device
 pipe = pipe.to(device)
 
 # Reduce memory usage
 pipe.enable_attention_slicing()
 
+print("✅ Model loaded successfully!\n")
+
+# Speech Recognition
+
+
+recognizer = sr.Recognizer()
+
 
 def listen_for_prompt():
-    """Listen to the microphone and convert speech into text."""
-
-    recognizer = sr.Recognizer()
+    """
+    Listen to the user's voice and convert it to text.
+    Returns:
+        str | None
+    """
 
     with sr.Microphone() as source:
 
         print("\n🎤 Speak your image prompt...")
         print("Listening...")
 
-        # Adjust to background noise
         recognizer.adjust_for_ambient_noise(
             source,
             duration=1
@@ -74,59 +78,48 @@ def listen_for_prompt():
             )
 
         except sr.WaitTimeoutError:
-            print("\n❌ No speech was detected.")
+            print("\n❌ No speech detected.")
             return None
 
     try:
-        prompt = recognizer.recognize_google(
-            audio
-        )
+        prompt = recognizer.recognize_google(audio)
 
-        print(f"\nYou said: {prompt}")
+        print(f"\n🗣️ You said: {prompt}")
 
         return prompt
 
     except sr.UnknownValueError:
-
-        print(
-            "\n❌ Sorry, I could not understand "
-            "the speech."
-        )
-
+        print("\n❌ Could not understand your speech.")
         return None
 
-    except sr.RequestError as error:
-
-        print(
-            "\n❌ Speech recognition service error:"
-        )
-
-        print(error)
-
+    except sr.RequestError as e:
+        print("\n❌ Speech Recognition Error")
+        print(e)
         return None
 
+# Image Generation
 
 def generate_image(prompt):
-    """Generate and save an image from the spoken prompt."""
+    """
+    Generate an AI image from a text prompt.
+    """
 
-    print("\n🎨 Generating your image...")
-    print("Please wait. This can take a while on CPU.")
+    print("\n🎨 Generating image...")
+    print("Please wait...\n")
+
+    start_time = time.time()
 
     try:
 
-        start_time = time.time()
-
         image = pipe(
-            prompt,
+            prompt=prompt,
             num_inference_steps=20,
             guidance_scale=7.5
         ).images[0]
 
         timestamp = int(time.time())
 
-        filename = (
-            f"generated_image_{timestamp}.png"
-        )
+        filename = f"generated_image_{timestamp}.png"
 
         image_path = os.path.join(
             OUTPUT_FOLDER,
@@ -135,32 +128,22 @@ def generate_image(prompt):
 
         image.save(image_path)
 
-        elapsed_time = (
-            time.time() - start_time
-        )
+        generation_time = time.time() - start_time
 
-        print("\n✅ Image generated successfully!")
+        print("✅ Image generated successfully!")
+        print(f"📁 Saved to : {image_path}")
+        print(f"⏱️ Generation Time : {generation_time:.2f} seconds")
 
-        print(
-            f"📁 Saved to: {image_path}"
-        )
-
-        print(
-            f"⏱️ Generation time: "
-            f"{elapsed_time:.1f} seconds"
-        )
-
-        # Open the image automatically
+        # Open image automatically
         image.show()
 
-    except Exception as error:
+    except Exception as e:
 
-        print(
-            "\n❌ Image generation failed:"
-        )
+        print("\n❌ Failed to generate image.")
+        print(e)
 
-        print(error)
 
+# Main Program
 
 def main():
 
@@ -173,14 +156,13 @@ def main():
 
         if prompt.lower() == "exit":
 
-            print(
-                "\n👋 Goodbye!"
-            )
-
+            print("\n👋 Thank you for using Speech-to-Image Generator!")
             break
 
         generate_image(prompt)
 
+
+# Run Application
 
 if __name__ == "__main__":
     main()

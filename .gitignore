@@ -1,5 +1,6 @@
 venv/
-.env
 __pycache__/
-generated_images/
+.env
+generated_images/*
+!generated_images/.gitkeep
 *.png
